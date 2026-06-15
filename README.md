@@ -5,7 +5,7 @@ A small Claude/Codex-compatible skill for basic AI desktop observation and keybo
 This is not a full Computer Use replacement. It provides a simple, auditable workflow:
 
 - screenshot with `cosmic-screenshot`
-- keyboard input with `wtype`
+- keyboard input with `wtype` mouse input with ydotool
 - agent-facing command examples
 - safety notes for local testing
 
