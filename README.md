@@ -10,3 +10,4 @@ This is not a full Computer Use replacement. It provides a simple, auditable wor
 - safety notes for local testing
 
 Best for terminal-driven workflows, browser address-bar navigation, and simple Rust/COSMIC app testing.
+still in testing.
