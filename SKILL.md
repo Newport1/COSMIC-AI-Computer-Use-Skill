@@ -2,8 +2,8 @@
 name: cosmic-computer-use
 description: >-
   Drive a COSMIC / Wayland desktop as an autonomous computer-use agent — SEE the
-  screen (cosmic-screenshot), then ACT with real mouse (a no-daemon uinput
-  helper) and keyboard (wtype), in a screenshot → reason → act → verify loop like
+  screen (cosmic-screenshot), then ACT with real mouse and keyboard (a persistent
+  uinput helper, plus wtype for typing), in a screenshot → reason → act → verify loop like
   Anthropic's reference computer use. Use whenever you must operate a GUI app on
   this machine: smoke-test or QA a desktop app by clicking/typing through it,
   reproduce a UI bug, walk a UI flow, or confirm a visual change a human would
@@ -28,14 +28,19 @@ next one. You never act blind, and you never assert a result you didn't see.
 
 | Sense / actuator | Tool | Notes |
 |---|---|---|
-| **Eyes** | `cosmic-screenshot` → save PNG → **Read** it | full-res, 1:1 with mouse coords. Does NOT capture the cursor — verify by *effect*, not pointer position. |
-| **Mouse** | `scripts/mouse.py` (bundled uinput helper) | absolute coords in screen space; no daemon, no sudo (uses `/dev/uinput`). move/click/double/drag/scroll. prefer ydotool when available |
-| **Keyboard** | `wtype` | type strings, single keys, modifier chords. |
+| **Eyes** | `scripts/shot.sh` → save PNG → **Read** it | full-res, 1:1 with mouse coords. The raw screenshot can't capture the cursor, so shot.sh draws a crosshair at the **last commanded** pointer position. Still verify by *effect*, not just the marker. |
+| **Mouse** | `scripts/mouse.py` | absolute coords in screenshot pixels; no sudo (uses `/dev/uinput` via a persistent per-user daemon it auto-starts). `move`/`click`/`double`/`drag`/`scroll`. |
+| **Keyboard (typing)** | `wtype` | type strings, keys, and chords *into the focused app*. |
+| **Keyboard (compositor shortcuts)** | `scripts/mouse.py key <combo>` | Super+M (maximize), Alt+Tab, etc. **must** use this — cosmic-comp ignores wtype's virtual keyboard for global shortcuts. |
 | **Brain** | your vision | read the screenshot, decide ONE next action, take it, re-screenshot. |
 
 Run `scripts/preflight.sh` first — it reports which of eyes/keyboard/mouse are
-live so you know whether you're in full computer-use mode or keyboard-only
-fallback.
+live (and, when `xdotool`+`xterm` exist, actually *verifies* the pointer warps),
+so you know whether you're in full computer-use mode or keyboard-only fallback.
+
+Paths below use the Claude Code install location
+`~/.claude/skills/cosmic-computer-use/`; adjust to wherever this skill lives.
+Call `python3 .../scripts/mouse.py stop` when finished to remove the virtual devices.
 
 ## First: MAXIMIZE the app under test
 
@@ -46,13 +51,17 @@ miss). This is the single biggest reliability win (learned the hard way: an
 un-maximized, terminal-occluded window is what makes a computer-use run flail).
 
 ```bash
-# focus the app (click its body), then maximize:
-python3 ~/.claude/skills/cosmic-computer-use/scripts/mouse.py move <x> <y> click left
-wtype -M logo -k Up -m logo          # Super+Up = maximize on COSMIC
+# select (click the window body to focus it) + maximize, in one call:
+~/.claude/skills/cosmic-computer-use/scripts/window.sh maximize <x> <y>
+# or do it explicitly — maximize acts on the FOCUSED window:
+#   mouse.py move <x> <y> click left   # select/focus
+#   mouse.py key super+m               # COSMIC default maximize (real uinput kbd)
 ```
-A freshly `gpu-launch.sh`-ed window usually opens focused and on top; maximize it,
-screenshot, and only then start the loop. If the controlling terminal keeps
-stealing the view, relaunch the app fresh (a new window grabs focus).
+Maximizing acts on the *focused* window, so you must click the target first (the
+`window.sh maximize X Y` form does both). A freshly launched window usually opens
+focused and on top; maximize it, screenshot, and only then start the loop. If the
+controlling terminal keeps stealing the view, relaunch the app fresh (a new window
+grabs focus).
 
 ## The loop (do this, every action)
 
@@ -88,12 +97,21 @@ After a click that should change the UI, screenshot and confirm the change.
 
 ## Acting — keyboard (wtype)
 
+`wtype` types **into the focused app**. Use it for text and app-level keys/chords:
 ```bash
 wtype "hello world"                 # type a string
 wtype -k Return                     # keys: Return Tab Escape BackSpace Delete Left Right Up Down Home End
-wtype -k logo                       # Super key
-wtype -M ctrl -k a -m ctrl          # chord: Ctrl+A  (press -M, key -k, release -m)
-wtype -M alt  -k Tab -m alt         # Alt+Tab (switch windows)
+wtype -M ctrl -k a -m ctrl          # app chord: Ctrl+A  (press -M, key -k, release -m)
+```
+**Compositor / window-manager shortcuts** (anything the desktop intercepts —
+maximize, window switching, the Super menu) are ignored from wtype; send them
+through the real uinput keyboard instead:
+```bash
+M=~/.claude/skills/cosmic-computer-use/scripts/mouse.py
+python3 $M key super+m              # maximize the focused window (COSMIC default)
+python3 $M key alt+Tab              # switch windows
+python3 $M key super+left           # tile/snap, etc.
+python3 $M key escape               # single key
 ```
 Note: `wtype --help` is broken on this build (prints "Missing argument to
 --help"); that's cosmetic — the tool works.
@@ -111,13 +129,15 @@ For a real test pass, use the two bundled agent profiles (`agents/`):
 Pattern: orchestrator writes the plan → tester runs it on the live app. Keep test
 artifacts (screenshots) under `/tmp/cu-run/` or a named run dir.
 
-## Verifying-by-effect (because the cursor is invisible in shots)
+## Verifying-by-effect (the cursor isn't in the raw screenshot)
 
-`cosmic-screenshot` doesn't capture the pointer, so you cannot see *where* the
-mouse is. Always pick targets whose **hit produces an unmistakable change**
-(navigation, a selection highlight, a panel opening) and confirm THAT, not the
-cursor. "No change after a click" is ambiguous — it may be a miss OR a click on
-inert space; re-aim using a known-reactive target before concluding.
+`cosmic-screenshot` doesn't capture the hardware pointer. `shot.sh` compensates by
+drawing a crosshair at the **last commanded** position — useful to confirm you
+aimed where you meant, but it shows intent, not proof the click landed. So always
+also pick targets whose **hit produces an unmistakable change** (navigation, a
+selection highlight, a panel opening) and confirm THAT. "No change after a click"
+is ambiguous — it may be a miss OR a click on inert space; re-aim using a
+known-reactive target before concluding.
 
 ## Limits & anti-patterns
 
@@ -130,9 +150,10 @@ inert space; re-aim using a known-reactive target before concluding.
   mouse ✗, fall back to keyboard navigation (Tab/arrows/hotkeys) and say so.
 
 ## Files
-- `scripts/preflight.sh` — capability check (eyes/keyboard/mouse/GPU).
-- `scripts/shot.sh` — quiet screenshot, prints the PNG path.
-- `scripts/mouse.py` — no-daemon uinput pointer (move/click/double/drag/scroll).
+- `scripts/preflight.sh` — capability check (eyes/keyboard/mouse/GPU); verifies a real pointer warp when `xdotool`+`xterm` are present.
+- `scripts/shot.sh` — quiet screenshot (+ synthetic cursor overlay), prints the PNG path.
+- `scripts/mouse.py` — persistent uinput pointer **and** keyboard daemon (`move`/`click`/`double`/`drag`/`scroll`/`key`/`status`/`stop`).
+- `scripts/window.sh` — window helpers (`maximize [X Y]`).
 - `references/agent-loop.md` — the loop in depth: targeting from screenshots,
   recovery when an action misses, evidence discipline.
 - `agents/ui-test-orchestrator.md` — writes a checkable test plan from a goal.

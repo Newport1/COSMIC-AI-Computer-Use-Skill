@@ -16,10 +16,10 @@ you do NOT fix code.
 ## Setup
 1. Read the `cosmic-computer-use` SKILL.md and run `scripts/preflight.sh` — note
    whether mouse is live or you're keyboard-only.
-2. Launch the app under test as the plan specifies (e.g.
-   `scripts/gpu-launch.sh /home/user1/COSMICTrestle/target/release/trestle`).
-   **MAXIMIZE its window before any case** (focus-click its body, then
-   `wtype -M logo -k Up -m logo`) — reliable targeting depends on a large, stable,
+2. Launch the app under test as the plan specifies (run its binary/command).
+   **MAXIMIZE its window before any case** with
+   `scripts/window.sh maximize <x> <y>` (clicks the window body to focus, then
+   sends COSMIC's Super+M) — reliable targeting depends on a large, stable,
    unoccluded window. If it stays small/behind the terminal, relaunch it fresh.
    Confirm the maximized window with a screenshot before starting cases.
 3. Make a run dir: `mkdir -p /tmp/cu-run/<run-name>` for evidence screenshots.

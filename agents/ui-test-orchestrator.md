@@ -14,8 +14,7 @@ with zero ambiguity about what counts as pass or fail. You do NOT drive the UI â
 you produce the plan.
 
 ## Inputs
-- The app under test (path/binary), how to launch it (e.g. on the dGPU via
-  `scripts/gpu-launch.sh`), and what it's supposed to do.
+- The app under test (path/binary), how to launch it, and what it's supposed to do.
 - Optionally: the app's own docs/README/feature list, a fresh screenshot or two
   to ground the layout, and any specific areas the human flagged.
 
