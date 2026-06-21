@@ -1,6 +1,6 @@
 # COSMIC AI Computer-Use Skill
 
-A small, auditable skill that lets an AI agent **drive a COSMIC / Wayland desktop**
+A small, auditable skill that lets an AI agent **drive a COSMIC / POPOS / LINUX/ Wayland desktop**
 the way a person would: take a screenshot, reason about it, then move the real
 mouse and press real keys — an observe → act → verify loop.
 
